@@ -15,7 +15,7 @@ st.set_page_config(
 
 st.title("🗺️ Dijkstra's Shortest Path Interactive Sandbox")
 st.markdown(
-    "Adjacency matrix ağırlıklarını düzenleyin, en kısa yolu hesaplayın, adımları canlı simülasyonla izleyin "
+    "Adjacency matrix ağırlıklarını düzenleyin, başlangıç ve hedef düğümleri seçin, adımları canlı simülasyonla izleyin "
     "ve verilerinizi **CSV/JSON** formatında dışa aktarın."
 )
 
@@ -47,7 +47,6 @@ labels_str = st.sidebar.text_input(
 )
 new_labels = [l.strip() for l in labels_str.split(",") if l.strip()]
 
-# Etiket değişikliği: matrisi koruyarak yeniden inşa et
 if new_labels != st.session_state.node_labels:
     if len(new_labels) < 2:
         st.sidebar.error("⚠️ En az 2 düğüm gerekli.")
@@ -97,7 +96,6 @@ edited_df = st.data_editor(
 )
 new_matrix = edited_df.to_numpy(dtype=float).copy()
 
-# Üst üçgen öncelikli deterministik simetri
 if not is_directed:
     old_matrix = st.session_state.adj_matrix
     for i in range(n_nodes):
@@ -109,7 +107,6 @@ if not is_directed:
 
 st.session_state.adj_matrix = new_matrix
 
-# Negatif ağırlık kontrolü
 if (st.session_state.adj_matrix < 0).any():
     st.error(
         "❌ Hata: Dijkstra algoritması negatif kenar ağırlıklarını desteklemez! "
@@ -117,9 +114,9 @@ if (st.session_state.adj_matrix < 0).any():
     )
     st.stop()
 
-# --- Önbellekli Adım Adım Dijkstra Motoru ---
+# --- Önbellekli Adım Adım Dijkstra Motoru (start_node ve target_node parametreleri eklendi) ---
 @st.cache_data(show_spinner=False)
-def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
+def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, target_node, n):
     adj_matrix = np.frombuffer(matrix_bytes).reshape(n, n)
     graph = {node_labels[i]: [] for i in range(n)}
 
@@ -139,7 +136,7 @@ def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
 
     steps.append({
         "step_number": 0,
-        "description": f"Başlangıç durumu. Kaynak düğüm '{start_node}' mesafesi 0, diğerleri sonsuz (∞).",
+        "description": f"Başlangıç durumu. Kaynak düğüm '{start_node}' mesafesi 0, hedef '{target_node}' olarak belirlendi.",
         "current_node": None,
         "relaxing_edge": None,
         "distances": {k: (v if v != float('inf') else None) for k, v in distances.items()},
@@ -149,13 +146,19 @@ def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
     })
 
     step_count = 1
-    while pq:
+    target_reached = False
+
+    while pq and not target_reached:
         current_distance, current_node = heapq.heappop(pq)
 
         if current_node in visited:
             continue
 
         visited.add(current_node)
+
+        # Hedef düğüme ulaşıldıysa isteğe bağlı erken durdurma veya bilgilendirme adımı eklenebilir
+        if current_node == target_node:
+            target_reached = True
 
         steps.append({
             "step_number": step_count,
@@ -207,6 +210,7 @@ distances, previous_nodes, simulation_steps = run_dijkstra_with_steps(
     st.session_state.adj_matrix.tobytes(),
     tuple(st.session_state.node_labels),
     start_node,
+    target_node,
     n_nodes,
 )
 shortest_path = reconstruct_path(previous_nodes, start_node, target_node)
@@ -214,7 +218,7 @@ shortest_path = reconstruct_path(previous_nodes, start_node, target_node)
 # --- Genel Sonuçlar Paneli ---
 col1, col2 = st.columns([1, 1])
 with col1:
-    st.subheader("📈 Rota Özeti")
+    st.subheader(f"📈 Rota Özeti ({start_node} ➔ {target_node})")
     target_dist = distances[target_node]
     if start_node == target_node:
         st.info("ℹ️ Başlangıç ve hedef aynı düğüm. En kısa mesafe: 0.")
@@ -309,6 +313,8 @@ def render_simulation_step(step_idx):
                 status = "Bekliyor 💤"
             elif node == current_step_data["current_node"]:
                 status = "Aktif Düğüm 🔍"
+            elif node == target_node:
+                status = "Hedef (Target) 🏁"
             elif is_visited:
                 status = "Ziyaret Edildi ✅"
             elif dist_val is not None:
@@ -337,7 +343,7 @@ def render_simulation_step(step_idx):
             st.success("✅ Kuyruk boşaldı — algoritma tamamlandı.")
 
     with sim_col2:
-        st.markdown("##### 🎨 Adıma Göre Graf Durumu")
+        st.markdown(f"##### 🎨 Adıma Göre Graf Durumu (Hedef: {target_node})")
         G = nx.DiGraph() if is_directed else nx.Graph()
         for label in st.session_state.node_labels:
             G.add_node(label)
@@ -369,6 +375,10 @@ def render_simulation_step(step_idx):
         for node in G.nodes():
             if node == current_step_data["current_node"]:
                 node_colors.append("#d62728")  # Aktif (kırmızı)
+            elif node == target_node and node == current_step_data["current_node"]:
+                node_colors.append("#d62728")
+            elif node == target_node:
+                node_colors.append("#17becf")  # Hedef (Cyan / Deniz Mavisi)
             elif node in current_step_data["visited"]:
                 node_colors.append("#2ca02c")  # Ziyaret (yeşil)
             elif current_step_data["current_node"] is None and node == start_node:
