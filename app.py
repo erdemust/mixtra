@@ -117,7 +117,7 @@ def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
         "description": f"Başlangıç durumu. Kaynak düğüm '{start_node}' mesafesi 0 olarak atandı, diğerleri sonsuz (∞).",
         "current_node": None,
         "relaxing_edge": None,
-        "distances": {k: (v if v != float('inf')) else None for k, v in distances.items()},
+        "distances": {k: (v if v != float('inf') else None) for k, v in distances.items()},
         "visited": list(visited),
         "previous": dict(previous_nodes),
         "queue": [[d, n] for d, n in pq if n not in visited]
@@ -137,7 +137,7 @@ def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
             "description": f"En küçük mesafeye sahip unvisited düğüm olarak '{current_node}' (Mesafe: {current_distance}) seçildi ve ziyaret edildiye eklendi.",
             "current_node": current_node,
             "relaxing_edge": None,
-            "distances": {k: (v if v != float('inf')) else None for k, v in distances.items()},
+            "distances": {k: (v if v != float('inf') else None) for k, v in distances.items()},
             "visited": list(visited),
             "previous": dict(previous_nodes),
             "queue": [[d, n] for d, n in pq if n not in visited]
@@ -158,7 +158,7 @@ def run_dijkstra_with_steps(matrix_bytes, node_labels, start_node, n):
                     "description": f"Güncelleme (Relaxation): '{current_node}' üzerinden '{neighbor}' düğümüne daha kısa yol bulundu. Yeni mesafe: {tentative_distance}.",
                     "current_node": current_node,
                     "relaxing_edge": [current_node, neighbor],
-                    "distances": {k: (v if v != float('inf')) else None for k, v in distances.items()},
+                    "distances": {k: (v if v != float('inf') else None) for k, v in distances.items()},
                     "visited": list(visited),
                     "previous": dict(previous_nodes),
                     "queue": [[d, n] for d, n in pq if n not in visited]
@@ -209,7 +209,6 @@ with col2:
 st.sidebar.markdown("---")
 st.sidebar.subheader("📥 Verileri İndir (Export)")
 
-# 1. Matris CSV İndirme
 csv_data = df_matrix.to_csv().encode('utf-8')
 st.sidebar.download_button(
     label="📊 Matrisi İndir (CSV)",
@@ -218,7 +217,6 @@ st.sidebar.download_button(
     mime="text/csv"
 )
 
-# 2. Simülasyon Logları JSON İndirme
 simulation_export_data = {
     "graph_info": {
         "nodes": st.session_state.node_labels,
@@ -229,7 +227,7 @@ simulation_export_data = {
     "final_results": {
         "shortest_path": shortest_path,
         "shortest_distance": target_dist if target_dist != float('inf') else None,
-        "all_distances": {k: (v if v != float('inf')) else "Infinity" for k, v in distances.items()}
+        "all_distances": {k: (v if v != float('inf') else "Infinity") for k, v in distances.items()}
     },
     "simulation_steps": simulation_steps
 }
@@ -241,7 +239,6 @@ st.sidebar.download_button(
     file_name="dijkstra_simulation_log.json",
     mime="application/json"
 )
-
 
 # --- İNTERAKTİF ADIM ADIM SİMÜLASYON OYNATICISI ---
 st.markdown("---")
@@ -297,7 +294,6 @@ def render_simulation_step(step_idx):
             })
         st.dataframe(pd.DataFrame(table_data), hide_index=True, use_container_width=True)
         
-        # Priority Queue Görünümü
         st.markdown("##### 🔄 Öncelik Kuyruğu (Min-Heap)")
         if current_step_data["queue"]:
             q_df = pd.DataFrame(current_step_data["queue"], columns=["Mesafe", "Düğüm"])
